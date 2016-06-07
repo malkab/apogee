@@ -29,13 +29,13 @@ class Role(object):
     comment = None
     """Role comment."""
 
-    def __init__(self, name, password, group=False, nologin=False, inherit=True, inrole=None, comment=None):
+    def __init__(self, name, password=None, group=False, nologin=False, inherit=True, inrole=None, comment=None):
         """
         Creates a new role.
 
         :param name: Name of the role.
         :type name: String
-        :param password: Role password. 
+        :param password: Role password. Defaults to None.
         :type password: String
         :param group: If the role is a group. Defaults to False.
         :type group: Boolean
@@ -44,7 +44,7 @@ class Role(object):
         :param inherit: If the role inherits privileges. Defaults to True.
         :type inherit: Boolean
         :param inrole: Parent role. Defaults to None.
-        :type inrole: String
+        :type inrole: apogee.core.Role
         :param comment: Role comment. Defaults to None.
         :type comment: String
         """
@@ -72,6 +72,9 @@ class Role(object):
     def alterPassword(self, password=None):
         """
         Alters password.
+
+        :param password: New password. Defaults to the current password.
+        :type password: String.
         """
         password = self.password if password is None else password
         return "alter role %s password '%s';\n\n" % (self.name, password)
@@ -114,9 +117,9 @@ class Role(object):
         :param privileges: List of privileges to grant on database object.
         :type privileges: List of strings
         """
-        if str(dbObject.__class__)=="<class 'pgbuild.core.Database'>":
+        if str(dbObject.__class__)=="<class 'apogee.core.Database'>":
             objType = "database"
-        elif str(dbObject.__class__)=="<class 'pgbuild.core.Schema'>":
+        elif str(dbObject.__class__)=="<class 'apogee.core.Schema'>":
             objType = "schema"
 
         privileges = privileges if isinstance(privileges, list) else [privileges]            
@@ -127,10 +130,15 @@ class Role(object):
     def grant(self, dbObject, privileges):
         """
         Grant permissions on database object.
+
+        :param dbObject: Database object to grant permissions on (currently Database or Schema).
+        :type dbObject: apogee.core.Database or apogee.core.Schema
+        :param privileges: List of privileges to grant on database object.
+        :type privileges: List of strings        
         """
-        if str(dbObject.__class__)=="<class 'pgbuild.core.Database'>":
+        if str(dbObject.__class__)=="<class 'apogee.core.Database'>":
             objType = "database"
-        elif str(dbObject.__class__)=="<class 'pgbuild.core.Schema'>":
+        elif str(dbObject.__class__)=="<class 'apogee.core.Schema'>":
             objType = "schema"
 
         privileges = privileges if isinstance(privileges, list) else [privileges]
@@ -142,6 +150,11 @@ class Role(object):
     def grantOnAllTablesInSchema(self, dbObject, privileges):
         """
         Grant permissions on all tables of a schema.
+
+        :param dbObject: Database object to grant permissions on (currently Database or Schema).
+        :type dbObject: apogee.core.Database or apogee.core.Schema
+        :param privileges: List of privileges to grant on database object.
+        :type privileges: List of strings        
         """
         priv = ', '.join(privileges)
 
@@ -194,27 +207,27 @@ class Database(object):
     permissions = None
     """Database permissions. List of tuples."""
     extensions = None
-    """Database extensions. List of pgbuild.core.extension."""
+    """Database extensions. List of apogee.core.Extension."""
     
         
-    def __init__(self, name, host, port, comment, owner=None, permissions=None, extensions=None):
+    def __init__(self, name, host="localhost", port="5432", comment=None, owner=None, permissions=None, extensions=None):
         """
         Constructor.
 
         :param name: The name of the database.
         :type name: String
-        :param name: Database host.
+        :param name: Database host. Optional, defaults to localhost.
         :type name: String
-        :param port: Database port.
+        :param port: Database port. Optional, defaults to 5432.
         :type port: Integer or String
-        :param comment: Database comment.
+        :param comment: Database comment. Optional.
         :type comment: String
         :param owner: Database owner. Optional.
-        :type owner: pgbuild.core.role
-        :param permissions: A tuple or list of tuples containing grants or revokes. For example (role_whatever.grant, ["connect", "usage").
+        :type owner: apogee.core.Role
+        :param permissions: A tuple or list of tuples containing grants or revokes methods and a list of permissions. For example (role_whatever.grant, ["connect", "usage"). Optional.
         :type permissions: Tuple or list of tuples
-        :param extensions: A pgbuild.core.extension or list of such to create extensions into the database.
-        :type extensions: pgbuild.core.extension or list of pgbuild.core.extension
+        :param extensions: A apogee.core.Extension or list of such to create extensions into the database. Optional.
+        :type extensions: apogee.core.Extension or list of apogee.core.Extension
         """
         
         self.name = name
@@ -222,7 +235,8 @@ class Database(object):
         self.port = str(port)
         self.comment = comment
         self.owner = owner
-        self.permissions = permissions if isinstance(permissions, list) else [permissions]
+        self.permissions = permissions if isinstance(permissions, list) else \
+            ([permissions] if permissions is not None else None)
         self.extensions = extensions if isinstance(extensions, list) else [extensions]
 
             
@@ -231,22 +245,23 @@ class Database(object):
         Outputs a \c command to the database for a given role. Default role is database owner, if any.
 
         :param role: Role to connect with.
-        :type role: pgbuild.core.role
+        :type role: apogee.core.role
         """
         role = role if role is not None else (self.owner if self.owner is not None else None)
         
-        out = "\c %s %s %s %s\n\n" % (self.name,
-                                      role.name if role is not None else "",
-                                      self.host if role is not None else "",
-                                      self.port if role is not None else "")
+        out = "\c %s%s%s%s\n\n" % (self.name,
+                                   " "+role.name if role is not None else "",
+                                   " "+self.host if role is not None else "",
+                                   " "+self.port if role is not None else "")
         return out
 
+    
     def create(self, owner=None):
         """
         Outputs database create string.
 
         :param owner: Owner of database. Optional. Defaults to the database owner, if any.
-        :type owner: pgbuild.core.role
+        :type owner: apogee.core.role
         """
 
         owner = owner if owner else (self.owner if self.owner else None)
@@ -256,24 +271,39 @@ class Database(object):
 
     
     def codeComment(self):
-        return Comment.comment(self.comment)
+        """
+        Returns the code comment for the database.
+        """
+        return Comment.comment(self.comment) if self.comment else ""
+
+
+    def sqlComment(self):
+        """
+        Returns SQL comment statement for Database.
+        """
+        return "comment on database %s is\n'%s';\n\n" % (self.name, self.comment) if self.comment else ""
+    
 
     def createPermissions(self):
-        out = "".join([i[0](self, i[1]) for i in self.permissions])
+        """
+        Returns permissions creation for the database.
+        """
+        if self.permissions is not None:
+            out = "".join([i[0](self, i[1]) for i in self.permissions])
+        else:
+            out = ""
+            
         return out
     
-    def sqlComment(self):
-        return "comment on database %s is\n'%s';\n\n" % (self.name, self.comment)
-
     
     def fullCreate(self, superuser=None, owner=None):
         """
         Full create output for database. Outputs a code comment, the create, a SQL comment, grants and revokes, and extensions.
 
         :param superuser: An optional superuser with privileges to create extensions, if any.
-        :type superuser: pgbuild.core.role
+        :type superuser: apogee.core.role
         :param owner: An optional owner. Defaults to the database owner.
-        :type owner: pgbuild.core.role
+        :type owner: apogee.core.role
         """
         
         owner = owner if owner else (self.owner if self.owner else None)
@@ -294,17 +324,24 @@ class Database(object):
 
 
 
-class Misc(object):
+class Helpers(object):
     """
-    Miscellaneous methods.
+    Miscellaneous and helpers methods.
     """
 
     @staticmethod
     def begin():
+        """
+        Returns a begin transaction command.
+        """
         return "begin;\n\n"
+
     
     @staticmethod
     def commit():
+        """
+        Returns a commit transaction command.
+        """
         return "commit;\n\n"
 
 
@@ -316,8 +353,7 @@ class Misc(object):
         :param analyze: Performs a vacuum analyze if True. Defaults to False.
         :type analyze: Boolean
         """
-        
-        return "vacuum%s;\n\n" % " analyze" if analyze else ""
+        return "vacuum%s;\n\n" % (" analyze" if analyze else "")
 
 
     @staticmethod
@@ -325,11 +361,29 @@ class Misc(object):
              fromto="from", encoding="utf-8", null="-"):
         """
         Returns a copy command.
-        schema: a schema object
-        table: a table object, or a String with simply the name of the table
-        path: path to/from file
+        
+        :param schema: A schema object.
+        :type schema: apogee.core.Schema
+        :param table: A table object, or a String with simply the name of the table.
+        :type table: apogee.core.Table or String
+        :param path: Path to/from file.
+        :type path: String
         :param columns: A list of columns defining the order they are found in the CSV. Optional.
         :type columns: List of strings
+        :param delimiter: CSV delimiter. Defaults to '|'.
+        :type delimiter: String
+        :param csv: Wheter the file is a CSV. Defaults to True.
+        :type csv: Boolean
+        :param header: Wheter the file has a header. Defaults to True.
+        :type header: Boolean
+        :param quote: Quote character to be used. Defaults to '"'.
+        :type quote: String
+        :param fromto: Wheter the copy is a from or a to. Possible values are 'from' or 'to'. Defaults to 'from'.
+        :type fromto: String 'from' or 'to'
+        :param encoding: Encoding the export is in. Defaults to 'utf-8'.
+        :type encoding: String
+        :param null: Null character placeholder. Defaults to '-'.
+        :type null: String
         """
 
         out = "\copy %s.%s%s %s '%s'" % (schema.name,
@@ -357,9 +411,9 @@ class Misc(object):
         :param blockComment: The initial block code comment. Optional.
         :type blockComment: String
         :param db: Database to connect to. Optional.
-        :type db: pgbuild.core.database
+        :type db: apogee.core.Database
         :param role: The role for connecting to the database. Optional.
-        :type role: pgbuild.core.role
+        :type role: apogee.core.Role
         :param echoDash: The initial echo dash comment. Optional. If it's omitted and blockComment is set, then it is used.
         :type echoDash: String
         """
@@ -367,8 +421,8 @@ class Misc(object):
         echoDash = echoDash if echoDash else (blockComment if blockComment else None)
         
         return \
-            (Comment.block(blockComment) if blockComment else "")+ \
-            (Comment.echoDash(echoDash) if echoDash else "")+ \
+            (Comment.block("Comienza: "+blockComment) if blockComment else "")+ \
+            (Comment.echoDash("Comienza: "+echoDash) if echoDash else "")+ \
             (db.connect(role) if db else "")
 
             
@@ -380,14 +434,14 @@ class Misc(object):
         :param echoDash: The final echo dash comment. Optional.
         :type echoDash: String
         :param db: Database to connect to. Optional.
-        :type db: pgbuild.core.database
+        :type db: apogee.core.Database
         :param role: The role for connecting to the database. Optional.
-        :type role: pgbuild.core.role
+        :type role: apogee.core.Role
         """
 
         return \
             (db.connect(role) if db else "")+ \
-            (Comment.echoDash(echoDash) if echoDash else "")
+            (Comment.echoDash("Termina: "+echoDash) if echoDash else "")
 
 
     @staticmethod
@@ -410,7 +464,7 @@ class Misc(object):
     @staticmethod
     def psqlExecute(files, path="."):
         """
-        Executes a psql file(s) with \i.
+        Insert an execute psql file(s) \i command.
 
         :param files: File(s) to execute.
         :type files: String or list of strings.
@@ -433,7 +487,7 @@ class Misc(object):
 
         :param file: File to read lines from.
         :type file: String
-        :param tag: Tag wrapping the intended block to be copied. In snippet, tags looks like -#-{tag}. Omit to copy the whole file, discarding any tag.
+        :param tag: Tag wrapping the intended block to be copied. In snippet, tags looks like -- -#-{tag}. Omit to copy the whole file, discarding any tag.
         :type tag: String
         :param path: Path containing the file. Defaults to 'static_snippets'.
         :type path: String
@@ -447,14 +501,14 @@ class Misc(object):
         while line:
             if tag=="":
                 inblock=True
-            elif line=="-#-{%s}\n" % tag:
+            elif line=="-- -#-{%s}\n" % tag:
                 if inblock==False:
                     inblock=True
                 else:
                     break
             
             if inblock:
-                if line[:4]<>"-#-{":
+                if line[:7]<>"-- -#-{":
                     out+=line
 
             line = f.readline()
@@ -624,11 +678,11 @@ class Schema(object):
         :param permissions: A tuple or list of tuples containing grants or revokes. For example (role_whatever.grant, ["connect", "usage").
         :type permissions: Tuple or list of tuples
         :param owner: Owner role.
-        :type owner: pgbuild.core.role
+        :type owner: apogee.core.role
         :param tables: Tables belonging to the schema.
-        :type tables: pgbuild.core.table or list of those.
+        :type tables: apogee.core.table or list of those.
         :param views: Views belonging to the schema.
-        :type views: pgbuild.core.view or list of those.
+        :type views: apogee.core.view or list of those.
         """
         
         self.name = name
@@ -663,7 +717,7 @@ class Schema(object):
                   i.refresh(self)
 
         out += Comment.echoDash("End: Refreshing materializing views for schema %s" % self.name)+ \
-          Misc.vacuum(True)
+          Helpers.vacuum(True)
           
         return out
 
@@ -697,14 +751,14 @@ class Schema(object):
           (Comment.block(blockComment) if blockComment else "")+ \
           (Comment.echoDash("Beginning: "+echoComment) if echoComment else "")+ \
           (db.connect(db_role) if db and db_role else "")+ \
-          (Misc.begin())+ \
+          (Helpers.begin())+ \
           (self.codeComment())+ \
           (self.create())+ \
           (self.sqlComment())+ \
           (self.createPermissions())+ \
           ("".join([i.fullCreate(self) for i in self.tables if i]))+ \
           ("".join([i.fullCreate(self) for i in self.views if i]))+ \
-          (Misc.commit())+ \
+          (Helpers.commit())+ \
           (Comment.echoDash("Ending: "+echoComment) if echoComment else "")
 
         return out
@@ -726,10 +780,10 @@ class Schema(object):
             (Comment.block(blockComment) if blockComment else "")+ \
             (Comment.echoDash("Beginning: "+echoComment) if echoComment else "")+ \
             (db.connect(db_role) if db and db_role else "")+ \
-            (Misc.begin())+ \
+            (Helpers.begin())+ \
             (self.codeComment())+ \
             (self.drop(cascade=True))+ \
-            (Misc.commit())+ \
+            (Helpers.commit())+ \
             (Comment.echoDash("Ending: "+echoComment) if echoComment else "")
         
         
@@ -967,7 +1021,7 @@ class View(object):
         Refreshes a materialized view.
 
         :param schema: The schema of the view.
-        :type schema: pgbuild.core.schema
+        :type schema: apogee.core.schema
         """
         return "refresh materialized view %s.%s;\n\n" % (schema.name, self.name) if self.materialized \
           else ""
