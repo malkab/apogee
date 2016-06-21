@@ -636,13 +636,13 @@ class Script(object):
         """
         Copy all static files to the generation folder.
 
-        :param folder: Folder where the static files are in. Defaults to 'statics'.
+        :param folder: Folder where the static files are in. Defaults to 'statics'. If not, it is relative to the src folder.
         :type folder: String
-        :param path: Path to drop files into. Optional. If this nor the class basePath is set defaults to the current folder.
+        :param path: Path to drop files into. Optional. If this nor the class basePath is set defaults to the current folder. If set, it is relative to the basePath.
         :type path: String
         """
         
-        path = path if path else (self.basePath if self.basePath else ".")
+        path = self.basePath+"/"+path if path else (self.basePath if self.basePath else ".")
         
         distutils.dir_util.copy_tree(folder, path)
 
