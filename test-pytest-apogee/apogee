@@ -1,0 +1,23 @@
+#!/usr/bin/env python
+# coding=UTF8
+
+import sys, testsub.core as core
+
+print sys.argv
+
+print sys.argv[1:]
+
+mod = __import__(sys.argv[1])
+
+mod.main()
+
+core.main()
+
+for i in dir(mod):
+    if i[:3]=="ap_":
+        print i
+        o = getattr(mod, i)
+
+        u = o["class"](o)
+
+        print u.param
