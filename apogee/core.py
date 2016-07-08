@@ -240,20 +240,12 @@ class Database(object):
         self.extensions = extensions if isinstance(extensions, list) else [extensions]
 
             
-    def connect(self, role=None):
+    def connect(self):
         """
-        Outputs a \c command to the database for a given role. Default role is database owner, if any.
+        Outputs a \c command to the database.
+        """
 
-        :param role: Role to connect with.
-        :type role: apogee.core.role
-        """
-        role = role if role is not None else (self.owner if self.owner is not None else None)
-        
-        out = "\c %s%s%s%s\n\n" % (self.name,
-                                   " "+role.name if role is not None else "",
-                                   " "+self.host if role is not None else "",
-                                   " "+self.port if role is not None else "")
-        return out
+        return "\c %s\n\n" % (self.name)
 
     
     def create(self, owner=None):
@@ -296,7 +288,7 @@ class Database(object):
         return out
     
     
-    def fullCreate(self, superuser=None, owner=None):
+    def fullCreate(self, owner=None):
         """
         Full create output for database. Outputs a code comment, the create, a SQL comment, grants and revokes, and extensions.
 
@@ -311,14 +303,20 @@ class Database(object):
         out = \
             self.codeComment()+ \
             self.create(owner)+ \
-            (self.connect(superuser) if superuser else "")+ \
             self.sqlComment()+ \
-            self.createPermissions()+ \
-            ("".join([i.create() for i in self.extensions]) if self.extensions<>[None] else "")
+            self.createPermissions()
 
         return out
-          
 
+              
+    def createExtensions(self):
+        """
+        Creates extensions for the database.
+        """
+
+        return "".join([i.create() for i in self.extensions]) if self.extensions<>[None] else ""
+        
+        
     def drop(self):
         return "drop database %s;\n\n" % self.name
 
@@ -404,16 +402,12 @@ class Helpers(object):
 
 
     @staticmethod
-    def header(blockComment=None, db=None, role=None, echoDash=None):
+    def header(blockComment=None, echoDash=None):
         """
         Writes a standard header with a block code comment, an echo dash comment, and a connection.
 
         :param blockComment: The initial block code comment. Optional.
         :type blockComment: String
-        :param db: Database to connect to. Optional.
-        :type db: apogee.core.Database
-        :param role: The role for connecting to the database. Optional.
-        :type role: apogee.core.Role
         :param echoDash: The initial echo dash comment. Optional. If it's omitted and blockComment is set, then it is used.
         :type echoDash: String
         """
@@ -422,25 +416,19 @@ class Helpers(object):
         
         return \
             (Comment.block("Comienza: "+blockComment) if blockComment else "")+ \
-            (Comment.echoDash("Comienza: "+echoDash) if echoDash else "")+ \
-            (db.connect(role) if db else "")
+            (Comment.echoDash("Comienza: "+echoDash) if echoDash else "")
 
             
     @staticmethod
-    def footer(echoDash=None, db=None, role=None):
+    def footer(echoDash=None):
         """
         Writes a standard footer with an echo dash comment and a connection.
 
         :param echoDash: The final echo dash comment. Optional.
         :type echoDash: String
-        :param db: Database to connect to. Optional.
-        :type db: apogee.core.Database
-        :param role: The role for connecting to the database. Optional.
-        :type role: apogee.core.Role
         """
 
         return \
-            (db.connect(role) if db else "")+ \
             (Comment.echoDash("Termina: "+echoDash) if echoDash else "")
 
 
@@ -735,14 +723,12 @@ class Schema(object):
         out = "".join([i[0](self, i[1]) for i in self.permissions if i])
         return out
 
-    def fullCreate(self, blockComment=None, echoComment=None, db=None, db_role=None):
+    def fullCreate(self, blockComment=None, echoComment=None):
         """
         Full render of the schema.
 
         blockComment: a string with the block comment.
         echoComment: a string with the echo comment. Starting: and End: will be prefixed. If None, equals blockComment if present.
-        db: a database instance to connect to to perform the creation.
-        db_role: a role to connect to the aforementioned database.
         """
 
         echoComment = echoComment if echoComment else (blockComment if blockComment else "")
@@ -750,7 +736,6 @@ class Schema(object):
         out = \
           (Comment.block(blockComment) if blockComment else "")+ \
           (Comment.echoDash("Beginning: "+echoComment) if echoComment else "")+ \
-          (db.connect(db_role) if db and db_role else "")+ \
           (Helpers.begin())+ \
           (self.codeComment())+ \
           (self.create())+ \
@@ -764,14 +749,12 @@ class Schema(object):
         return out
 
     
-    def fullDrop(self, blockComment=None, echoComment=None, db=None, db_role=None):
+    def fullDrop(self, blockComment=None, echoComment=None):
         """
         Full drop of a schema.
 
         blockComment: a string with the block comment.
         echoComment: a string with the echo comment. Starting: and End: will be prefixed. Equals the blockComment if ommited.
-        db: database to connect to.
-        db_role: role for connecting to the database.
         """
 
         echoComment = echoComment if echoComment else (blockComment if blockComment else "")
@@ -779,7 +762,6 @@ class Schema(object):
         return \
             (Comment.block(blockComment) if blockComment else "")+ \
             (Comment.echoDash("Beginning: "+echoComment) if echoComment else "")+ \
-            (db.connect(db_role) if db and db_role else "")+ \
             (Helpers.begin())+ \
             (self.codeComment())+ \
             (self.drop(cascade=True))+ \
@@ -861,9 +843,13 @@ class Table(object):
         if owner is not None:
             self.owner = owner
 
-    def alterOwner(self, schema, owner):
-        return "alter table %s.%s owner to %s;\n\n" % (schema.name, self.name, owner.name)
 
+    def alterOwner(self, schema, owner=None):
+        owner = owner if owner else self.owner
+
+        return "alter table %s.%s owner to %s;\n\n" % (schema.name, self.name, owner.name)        
+
+        
     def codeComment(self):
         return Comment.comment(self.comment)
     
@@ -929,9 +915,13 @@ class Table(object):
         return "".join(comments)
 
     def fullCreate(self, schema):
-        return self.codeComment()+self.create(schema)+self.primaryKey(schema)+ \
-          self.createIndexes(schema)+self.sqlComment(schema)+ \
-          self.columnComments(schema)
+        return \
+            self.codeComment()+ \
+            self.create(schema)+ \
+            self.alterOwner(schema)+ \
+            self.primaryKey(schema)+ \
+            self.createIndexes(schema)+self.sqlComment(schema)+ \
+            self.columnComments(schema)
 
 
 
@@ -1027,7 +1017,9 @@ class View(object):
           else ""
 
                       
-    def alterOwner(self, schema, owner):
+    def alterOwner(self, schema, owner=None):
+        owner = owner if owner else self.owner
+        
         return "alter %sview %s.%s owner to %s;\n\n" % (
             "materialized " if self.materialized else "",
             schema.name, self.name, owner.name)
@@ -1082,6 +1074,10 @@ class View(object):
         return "".join(comments)
 
     def fullCreate(self, schema):
-        return self.codeComment()+self.create(schema)+ \
-          self.createIndexes(schema)+self.sqlComment(schema)+ \
-          self.columnComments(schema)
+        return \
+            self.codeComment()+ \
+            self.create(schema)+ \
+            self.alterOwner(schema)+ \
+            self.createIndexes(schema)+ \
+            self.sqlComment(schema)+ \
+            self.columnComments(schema)
