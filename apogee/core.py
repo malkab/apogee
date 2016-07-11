@@ -3,6 +3,31 @@
 
 import os, distutils.dir_util, sys
 
+class Tablespace(object):
+    """
+    Tablespace object.
+    """
+
+    name = None
+    """Tablespace name."""
+
+    location = None
+    """Tablespace location."""
+    
+    def __init__(self, name, location=None):
+        """
+        Defines a new tablespace.
+
+        :param name: Name of the tablespace.
+        :type name: String
+        :param location: Location of the tablespace, optional.
+        :type location: String
+        """
+        self.name = name
+        self.location = location
+
+
+        
 class Role(object):
     """
     Database role.
@@ -196,21 +221,30 @@ class Database(object):
 
     name = None
     """Database name."""
+    
     host = None
     """Database host."""
+    
     port = None
     """Port. String."""
+    
     comment = None
     """Database comment."""
+    
     owner = None
     """Database owner. A role instance."""
+    
     permissions = None
     """Database permissions. List of tuples."""
+    
     extensions = None
     """Database extensions. List of apogee.core.Extension."""
     
+    tablespace = None
+    """Database tablespace."""
+    
         
-    def __init__(self, name, host="localhost", port="5432", comment=None, owner=None, permissions=None, extensions=None):
+    def __init__(self, name, host="localhost", port="5432", comment=None, owner=None, permissions=None, extensions=None, tablespace=None):
         """
         Constructor.
 
@@ -228,6 +262,8 @@ class Database(object):
         :type permissions: Tuple or list of tuples
         :param extensions: A apogee.core.Extension or list of such to create extensions into the database. Optional.
         :type extensions: apogee.core.Extension or list of apogee.core.Extension
+        :param tablespace: The default database tablespace.
+        :type tablespace: apogee.core.Tablespace
         """
         
         self.name = name
@@ -238,6 +274,7 @@ class Database(object):
         self.permissions = permissions if isinstance(permissions, list) else \
             ([permissions] if permissions is not None else None)
         self.extensions = extensions if isinstance(extensions, list) else [extensions]
+        self.tablespace=tablespace
 
             
     def connect(self):
@@ -258,8 +295,10 @@ class Database(object):
 
         owner = owner if owner else (self.owner if self.owner else None)
         
-        return "create database %s%s;\n\n" % (self.name,
-                                          " owner %s" % owner.name if owner else "")
+        return "create database %s%s%s;\n\n" % \
+          (self.name,
+           " owner %s" % owner.name if owner else "",
+           " tablespace %s" % self.tablespace.name if self.tablespace else "")
 
     
     def codeComment(self):
