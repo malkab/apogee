@@ -741,11 +741,11 @@ class Schema(object):
         for i in self.views:
             if i.materialized:
                 out += Comment.echo("Materializing view %s" % i.name)+ \
-                  i.refresh(self)
+                  i.refresh(self)+ \
+                  i.vacuum(self)
 
-        out += Comment.echoDash("End: Refreshing materializing views for schema %s" % self.name)+ \
-          Helpers.vacuum(True)
-          
+        out += Comment.echoDash("End: Refreshing materializing views for schema %s" % self.name)
+
         return out
 
     
@@ -1108,10 +1108,21 @@ class View(object):
         
         return out
 
+    
+    def vacuum(self, schema):
+        """
+        Vacuum the view.
+        """
+        return "vacuum %s.%s;\n\n" % (schema.name, self.name)
+    
+    
     def columnComments(self, schema):
-        comments = [i.sqlComment(schema, self) for i in self.columns]
-        return "".join(comments)
-
+        if self.columns: 
+            comments = [i.sqlComment(schema, self) for i in self.columns]
+            return "".join(comments)
+        else:
+            return ""
+        
     def fullCreate(self, schema):
         return \
             self.codeComment()+ \
