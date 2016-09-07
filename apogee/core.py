@@ -607,7 +607,7 @@ class Comment(object):
     
     
 
-class Script(object):
+class ScriptWriter(object):
     """
     Class to render scripts.
     """        
@@ -1131,3 +1131,4 @@ class View(object):
             self.createIndexes(schema)+ \
             self.sqlComment(schema)+ \
             self.columnComments(schema)
+
