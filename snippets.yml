@@ -1,0 +1,16 @@
+# Snippets
+
+snippets:
+    - name: test_municipios
+      source: |
+        create table test_data.municipio as
+        select * from context.municipio
+        where cod_mun in ({{test_municipios}});
+
+    - name: create_table
+      source: |
+        create table test_data.grid_250 as
+        select
+          a.*
+        from
+          context.grid_250 a inner join

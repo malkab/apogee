@@ -1,0 +1,35 @@
+# Tables
+
+
+
+  - name: grid__#gridSuffix_#
+    iterate:
+        - gridSuffix: "250"
+          gridSize: 250
+        - gridSuffix: "125"
+          gridSize: 125
+        - gridSuffix: "62_5"
+          gridSize: 62.5
+        - gridSuffix: "31_25"
+          gridSize: 31.25
+    owner: _@role_catastro_admin_@
+    comment: |
+        Rejilla de _#gridSize_#xit metros para Andalucía. Los códigos son heredados de la rejilla de referencia utilizada para su construcción, la de 250 metros del IECA (Instituto de Estadística y Cartografía de Andalucía), que a su vez se crea a partir de la rejilla oficial europea de 1 km.
+    keys:
+      - columns:
+          - gid
+    indexes:
+      - name: geomgist_#gridSize_#
+        columns:
+          - geom
+        type: gist
+    columns:
+      - name: gid
+        type: bigint
+        comment: ID de la rejilla.
+      - name: grd_fixid
+        type: varchar(27)
+        comment: Un código de rejilla.
+      - name: geom
+        type: geometry(POLYGON, 25830)
+        comment: Geometría de la rejilla de _#gridSize_#, POLYGON, EPSG:25830.

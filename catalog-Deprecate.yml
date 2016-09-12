@@ -1,0 +1,7 @@
+# Groups
+
+Group_group_a:
+    name: group_a
+    ingroup: Group_catastro_users
+    inherit: True
+    comment: This is the group_a comment.

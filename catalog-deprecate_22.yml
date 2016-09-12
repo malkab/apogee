@@ -1,0 +1,222 @@
+# Group
+
+- id: Group::_@role_catastro_users_@
+  name: _@role_catastro_users_@
+  inherit: True
+  comment: Grupo de usuarios de la base de datos de catastro.
+
+
+# Roles
+
+- id: Role::PUBLIC
+  name: PUBLIC
+
+- id: Role::_@role_super_@
+  name: _@role_super_@
+  password: _@role_super_pass_@
+  comment: The superuser.
+
+- id: Role::_#name_#
+  name: _#name_#
+  password: _#password_#
+  ingroup: Group::_@role_catastro_users_@
+  comment: _#comment_#
+  with:
+    - name: _@role_catastro_admin_@
+      password: _@role_catastro_admin_pass_@
+      comment: The superuser.
+    - name: _@role_catastro_op_@
+      password: _@role_catastro_op_pass_@
+      comment: Operador de la base de datos de catastro.
+
+- id: Role::_@role_geoserver_@
+  name: _@role_geoserver_@
+  password: _@role_geoserver_pass_@
+  comment: Usuario para acceso de GeoServer de la base de datos de catastro.
+
+
+# Database extensions
+
+- id: Extension::postgis
+  name: postgis
+  comment: The super PostGIS geospatial super extension.
+
+
+# Databases
+
+- id: Database::_@superdb_@
+  name: _@superdb_@
+  host: _@host_@
+  port: _@port_@
+  comment: The super DB.
+
+- id: Database::_@db_@
+  name: _@db_@
+  host: _@host_@
+  port: _@port_@
+  owner: Role::_@role_catastro_admin_@
+  comment: Catastro database.
+  extensions:
+    - Extension::postgis
+  permissions:
+    - role: Role::PUBLIC
+      action: revoke
+      privileges:
+        - connect
+        - temp
+    - role: Group::_@role_catastro_users_@
+      action: grant
+      privileges:
+        - connect
+        - temp
+    - role: Role::_@role_geoserver_@
+      action: grant
+      privileges:
+        - connect
+
+
+# Schema public
+
+- id: Table::spatial_ref_sys
+  name: spatial_ref_sys
+  comment: Tabla estándar PostGIS para almacenamiento de información de SRS.
+
+- id: View::_#name_#
+  name: _#name_#
+  comment: _#comment_#
+  with:
+    - name: geometry_columns
+      comment: Vista estándar PostGIS para consulta de columnas geométricas.
+    - name: geography_columns
+      comment: Vista estándar PostGIS para consulta de columnas geográficas.
+    - name: raster_columns
+      comment: Vista estándar PostGIS para la consulta de columnas ráster.
+    - name: raster_overviews
+      comment: Vista estándar PostGIS para almacenar pirámides ráster.
+
+- id: Schema::public
+  name: public
+  comment: Esquema público estándar. Contiene los esquemas de las extensiones.
+  tables:
+    - Table::spatial_ref_sys
+  views:
+    - View::geometry_columns
+    - View::geography_columns
+    - View::raster_columns
+    - View::raster_overviews
+  permissions:
+    - role: Role::PUBLIC
+      action: revoke
+      privileges:
+        - usage
+        - create
+    - role: Group::_@role_catastro_users_@
+      action: grant
+      privileges:
+        - usage
+        - select all tables
+    - role: Role::_@role_geoserver_@
+      action: grant
+      privileges:
+        - select all tables
+
+
+# Schema context
+
+# Tables
+
+- id: Table::grid__#gridSuffix_#
+  name: grid__#gridSuffix_#
+  owner: Role::_@role_catastro_admin_@
+  comment: |
+    Rejilla de _#gridSize_# metros para Andalucía. Los códigos son heredados de la rejilla de referencia utilizada para su construcción, la de 250 metros del IECA (Instituto de Estadística y Cartografía de Andalucía), que a su vez se crea a partir de la rejilla oficial europea de 1 km.
+  with:
+    - gridSuffix: "250"
+      gridSize: 250
+    - gridSuffix: "125"
+      gridSize: 125
+    - gridSuffix: "62_5"
+      gridSize: 62.5
+    - gridSuffix: "31_25"
+
+- id: Schema::context
+  name: context
+  comment: Esquema para los datos de contexto.
+  owner: Role::_@role_catastro_admin_@
+  tables:
+    - name: Table::grid__#name_#
+      with:
+        - name: "250"
+        - name: "125"
+        - name: "62_5"
+        - name: "31_25"
+  permissions:
+    - role: Group::_@role_catastro_users_@
+      action: grant
+      privileges:
+        - usage
+    - role: Role::_@role_geoserver_@
+      action: grant
+      privileges:
+        - usage
+
+
+
+
+
+# Scripts
+
+- id: Script::0010-Database_Roles-DDL
+  name: 0010-Database_Roles-DDL
+  file: 0010-Database_Roles-DDL.sql
+  comment: Database, groups, and role creation
+  content:
+    - object: Database::_@superdb_@
+      action: connect
+    - object: Group::_@role_catastro_users_@
+      action: fullCreate
+    - family: Role
+      but:
+        - Role::PUBLIC
+        - Role::_@role_super_@
+      action: fullCreate
+    - object: Database::_@db_@
+      action: fullCreate
+    - object: Schema::public
+      action: alterOwner
+      newowner: Role::_@role_catastro_admin_@
+    - object: Schema::public
+      action: fullComment
+    - object: Schema::public
+      action: alterTableOwner
+      newowner: Role::_@role_catastro_admin_@
+    - object: Schema::public
+      action: alterViewOwner
+      newowner: Role::_@role_catastro_admin_@
+    - object: Schema::public
+      action: setPermissions
+
+- id: Script::0010-Database_Roles-Drop
+  name: 0010-Database_Roles-Drop
+  file: 0010-Database_Roles-Drop.sql
+  comment: Database and role drops
+  content:
+    - object: Database::_@superdb_@
+      action: connect
+    - object: Database::_@db_@
+      action: fullDrop
+    - family: Role
+      action: fullDrop
+      but:
+        - Role::PUBLIC
+        - Role::_@role_super_@
+    - family: Group
+      action: fullDrop
+
+- id: Script::0030-Context-00-Schema-DDL
+  name: 0030-Context-00-Schema-DDL
+  file: 0030-Context-00-Schema-DDL.sql
+  comment: Creación del esquema de datos de contexto
+  content:
+    - object: Schema::context
+      action: fullCreate

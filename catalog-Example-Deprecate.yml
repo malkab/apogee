@@ -1,0 +1,149 @@
+# Roles
+
+roles:
+  - name: PUBLIC
+    inherit: False
+    comment: |
+      Public role.
+
+  - name: _@role_super
+    password: _@role_super_pass
+    comment: |
+      The superuser.
+
+  - name: _@role_catastro_users
+    group: True
+    nologin: True
+    comment: |
+      Grupo de usuarios de la base de datos de catastro.
+
+  - name: _@role_catastro_admin
+    password: _@role_catastro_admin_pass
+    inrole: _@role_catastro_users
+    comment: |
+      Administrador y dueño de la base de datos de catastro.
+
+  - name: _@role_catastro_op
+    password: _@role_catastro_op_pass
+    inrole: _@role_catastro_users
+    comment: |
+      Operador de la base de datos de catastro.
+
+  - name: _@role_geoserver
+    password: _@role_geoserver_pass
+    comment: Usuario para acceso de GeoServer de la base de datos de catastro.
+
+
+
+# Database extensions
+
+extensions:
+  - name: postgis
+    comment: |
+      The super PostGIS geospatial super extension.
+
+
+
+# Databases
+
+databases:
+  - name: _@superdb
+    host: _@host
+    port: _@port
+    comment: |
+      The super DB.
+
+  - name: _@db
+    host: _@host
+    port: _@port
+    owner: _@role_catastro_admin
+    extensions:
+      - postgis
+    permissions:
+      - role: PUBLIC
+        action: revoke
+        privileges:
+          - connect
+          - temp
+      - role: _@role_catastro_users
+        action: grant
+        privileges:
+          - connect
+          - temp
+      - role: _@role_geoserver
+        action: grant
+        privileges:
+          - connect
+
+
+
+# Tables
+
+tables:
+  - name: tableA
+    owner: _@role_catastro_admin
+    comment: This is the comment for tableA.
+    keys:
+      - columns: gid
+    indexes:
+      - name: geomgist
+        columns:
+          - geom
+        type: gist
+    columns:
+      - name: gid
+        type: bigint
+        comment: ID de la rejilla.
+      - name: grd_fixid
+        type: varchar(27)
+        comment: Un código de rejilla
+      - name: geom
+        type: geometry(POLYGON, 25830)
+        comment: Geometría de la rejilla, POLYGON, EPSG:25830.
+
+  - name: tableB
+    owner: _@role_catastro_admin
+    comment: This is the comment for tableB.
+    keys:
+      - columns: gid
+    indexes:
+      - name: geomgist
+        columns:
+          - geom
+        type: gist
+    columns:
+      - name: gid
+        type: bigint
+        comment: ID de la rejilla.
+      - name: grd_fixid
+        type: varchar(27)
+        comment: Un código de rejilla
+      - name: geom
+        type: geometry(POLYGON, 25830)
+        comment: Geometría de la rejilla, POLYGON, EPSG:25830.
+
+
+# Schemas
+
+schemas:
+  - name: schemaA
+    owner: _@role_geoserver
+    comment: This is the comment for schemaA.
+    permissions:
+      - role: PUBLIC
+        action: revoke
+        privileges:
+          - connect
+          - temp
+      - role: _@role_catastro_users
+        action: grant
+        privileges:
+          - connect
+          - temp
+      - role: _@role_geoserver
+        action: grant
+        privileges:
+          - connect
+    tables:
+        - tableA
+        - tableB

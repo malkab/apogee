@@ -1,0 +1,27 @@
+# Globals
+
+globals:
+    gridnames: ["250", "125", "62_5", "31_25"]
+    gridsizes: [250, 125, 62.5, 31.25]
+    role_super: postgres
+    role_super_pass: postgres
+    role_catastro_users: catastro_users
+    role_catastro_admin: catastro_admin
+    role_catastro_admin_pass: catastro_admin
+    role_catastro_op: catastro_op
+    role_catastro_op_pass: catastro_op
+    role_geoserver: geoserver
+    role_geoserver_pass: geoserver
+    superdb: postgres
+    host: localhost
+    port: 5437
+
+targets:
+    localhost_catastro_puebla:
+      db: catastro_puebla
+
+
+    # A target must have at least a member to work
+    localhost_catastro_test:
+      db: catastro_test
+      role_catastro_admin: the_thing
