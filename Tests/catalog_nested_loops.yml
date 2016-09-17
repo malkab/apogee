@@ -1,0 +1,36 @@
+# First rule: 'id', 'with' and 'expandlist' are reserved keys. Don't use them!
+# Second: all items must have an 'id' key that resolves into an unique key.
+# The ID must be in the form ObjectType::ObjectID, where ObjectType may be, in
+# order of processing precedence:
+#   Group, Role, Database, Column, Table, View, Schema, Script
+
+
+- id: Group::_{name}__follow_here
+  name: _{name}_
+  comment: Group _{name}_ comment.
+  expandable:
+    - expandableitem1: _{c1}_
+      expandableitem2: _{c2}_
+      with:
+        - c1: item a1
+          c2: item a2
+        - c1: item a1
+          c2: item a2
+        - c1: item a1
+          c2: item a2
+  with:
+    - name: group1
+    - name: group2
+    - name: group3
+    - name: anotherg3
+
+- id: Role::Arole
+  name: Arole
+  comment: Arole comment.
+
+- id: Database::Adatabase
+  name: Adatabase
+  schemas: __select Schema::schema* but Schema::schema1
+  comment: Adatabase comment.
+
+- id: Schema::schema1

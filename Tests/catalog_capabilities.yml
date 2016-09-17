@@ -1,0 +1,102 @@
+# Groups: roles that are designed to be containers for other roles and define
+# broad permissions
+
+# All objects needs an ID. This ID will the identifier used within the catalog
+# for cross-object reference
+# ID may use internal loop variables _{ }_ to generate a family of objects,
+# but ID must be unique
+# ID must be prefixed by the object type, separated from the identifier with ::
+
+- id: Group::group_a
+  name: group_a
+  inherit: True
+  comment: Group A of users.
+
+- id: Group:group_b
+  name: group_b
+  inherit: True
+  ingroup: Group::group_a
+  comment: Group B of users, child of Group A.
+
+
+# Roles: database users that may be in a group
+# All databases are provided by default by the role PUBLIC
+
+- id: Role::role_a
+  name: role_a
+  password: role_a_pass
+  inherit: True
+  ingroup: Group::group_a
+  comment: This is the comment for role_a.
+
+# Several users can be created in one step with a loop
+# _{ }_ is the mark for loop substitution
+- id: Role::_{name}_
+  name: _{name}_
+  password: _{pass}_
+  inherit: True
+  ingroup: Group::group_b
+  comment: This is comment for user _{name}_.
+  with:
+      - name: role_b
+        pass: role_b_pass
+      - name: role_c
+        pass: role_c_pass
+
+- id: Role::role_d
+  name: role_d
+  password: role_d_pass
+  comment: This is comment for user role_d.
+
+
+# Databases
+# By default, database postgres is created on every run
+
+- id: Database::db
+  name: db
+  host: localhost
+  port: 5432
+  owner: Role::role_a
+  comment: This is comment for database db.
+  # Must be created with a create extension statement
+  extensions: ["postgis"]
+  permissions:
+      - role: Role::role_b
+        action: revoke
+        privileges: ["connect", "temp"]
+      - role: Role::_{role}_
+        action: grant
+        privileges: ["connect", "temp"]
+        with:
+            - role: role_c
+            - role: role_d
+  schemas:
+      - 
+
+
+# Schemas
+# All databases include the public schema by default
+# If database extension include the PostGIS extension,
+# PostGIS tables will be also automatically documented and created
+
+- id: Schema::schema__{name}_
+  name: _{name}_
+  comment: This is comment for schema _{name}_
+  owner: _{owner}_
+  tables:
+      - name: Table::grid__{name}_
+        with:
+            - name: "250"
+            - name: "125"
+  permissions:
+      - role: Group::group_a
+        action: grant
+        privileges:
+            - usage
+      - role: _{role}_
+        action: grant
+        privileges:
+            - usage
+        with:
+            - role: Role::role_b
+            - role: Role::role_c

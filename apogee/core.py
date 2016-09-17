@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # coding=UTF8
 
-import copy, yaml
+import copy, yaml, sys, apogee.dbobjects as dbobjects
+
+reload(dbobjects)
 
 ### TODO: continue defining basic YAML processing,
 ### final YAML formats and capabilities for configuration, catalog, and scripts
@@ -44,21 +46,21 @@ class Apogee(object):
         sys.exit(1)        
 
                 
-    def loadCatalog(self, catalogName="catalog.yml"):
+    def __loadCatalog(self, catalog):
         """
         Loads a catalog, a YAML file with object definitions.
 
-        catalogName: Name of the catalog file, "catalog.yml" by default.
+        catalog: Name of the catalog file, "catalog.yml" by default.
         """
         try:
-            with open(catalogName, "r") as stream:
+            with open(catalog, "r") as stream:
                 try:
                     self.catalog = yaml.load(stream)
                 except yaml.scanner.ScannerError as e:
-                    self.cliError("Catalog %s YAML file malformed:" % catalogName, e)
+                    self.cliError("Catalog %s YAML file malformed:" % catalog, e)
 
         except IOError as e:
-            self.cliError("Catalog file %s not found" % catalogName, e)
+            self.cliError("Catalog file %s not found" % catalog, e)
 
 
     def __dictSubstitution(self, dictionary, macros, startMark="_{", endMark="}_"):
@@ -72,18 +74,18 @@ class Apogee(object):
         """
 
         for k,v in dictionary.iteritems():
-            if startMark in v:
-                tag = v[v.find(startMark)+len(startMark):v.find(endMark)]
-                dictionary[k] = macros[tag]
+            if isinstance(v, (str, unicode)) and startMark in v:
+                start = v.find(startMark)
+                end = v.find(endMark)
+                tag = v[start+len(startMark):end]
+                dictionary[k] = v[:start]+macros[tag]+v[end+len(endMark):]
 
         return dictionary
         
 
-    def expandCatalog(self, objects):
+    def __expandWithCatalog(self, objects):
         """
         Deals with catalog 'with' expansion.
-
-        TODO: Make private.
         """
 
         # Is objects a list?
@@ -93,7 +95,6 @@ class Apogee(object):
 
             # Iterate...
             while i<len(objects):
-
                 # Is the next element a dict?
                 if isinstance(objects[i], dict):
                     # and has a loop clause?
@@ -109,19 +110,40 @@ class Apogee(object):
                         # Once iterations are over, delete the original with element
                         objects.pop(i)
                     else:
-                        # If there is no "with", just process the dictionary as normal and advance to the
-                        # next element
-                        objects[i] = self.expandCatalog(objects[i])
+                        # If there is no "with" nor "expandList",
+                        # just process the dictionary as normal
+                        # and advance to the next element
+                        objects[i] = self.__expandWithCatalog(objects[i])
                         i += 1
                 else:
                     # if its a list or scalar, just process as normal and advance
-                    objects[i] = self.expandCatalog(objects[i])
+                    objects[i] = self.__expandWithCatalog(objects[i])
                     i += 1
                         
         if isinstance(objects, dict):
             # If a dict, process as normal
             for k,v in objects.iteritems():
-                objects[k] = self.expandCatalog(v)
+                objects[k] = self.__expandWithCatalog(v)
 
         # Return if a scalar or done processing
         return objects
+
+
+    def processCatalog(self, catalog="catalog.yml"):
+        self.__loadCatalog(catalog)
+        self.__expandWithCatalog(self.catalog)
+
+        processingPrecedence = ["Group", "Role", "Database"] #, "Column",
+                                # "Table", "View", "Schema", "Script"]
+
+        # Iterate types of objects and try to convert them to proper objects
+        for i in processingPrecedence:
+            for c in self.catalog:
+                if c["id"][:c["id"].find("::")]==i:
+                    type = c["id"][0:c["id"].find("::")]
+                    c["apogee"] = self
+                    self.objects[c["id"]] = getattr(dbobjects, type)(**c)
+                    
+                
+        # self.__expandListCatalog(self.catalog)
+

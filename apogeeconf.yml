@@ -17,9 +17,9 @@ globals:
     port: 5437
 
 targets:
+    # A target must have at least a member to work
     localhost_catastro_puebla:
       db: catastro_puebla
-
 
     # A target must have at least a member to work
     localhost_catastro_test:
