@@ -12,7 +12,7 @@
   inherit: True
   comment: Group A of users.
 
-- id: Group:group_b
+- id: Group::group_b
   name: group_b
   inherit: True
   ingroup: Group::group_a

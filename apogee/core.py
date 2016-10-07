@@ -45,7 +45,8 @@ class Apogee(object):
         print "------------------------------"                                        
         sys.exit(1)        
 
-                
+
+    # TODO: Rewrite, this functionality has gone to yates
     def __loadCatalog(self, catalog):
         """
         Loads a catalog, a YAML file with object definitions.
